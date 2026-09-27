@@ -139,6 +139,50 @@ mod 工程都会踩到（`26.3.0.17` ~ `26.3.0.23-beta` 全部如此）。
 
 JST 2.0.6 之后官方已迭代到 2.0.11，此问题在新版 JST 下消失。
 
+## NeoForge 客户端启动问题（第二个上游坑）
+
+**现象**
+
+```
+$ .\gradlew.bat :NeoForge:runClient
+* What went wrong:
+Class org.gradle.jvm.toolchain.JvmVendorSpec does not have member field
+  'org.gradle.jvm.toolchain.JvmVendorSpec IBM_SEMERU'
+
+  at org.gradle.toolchains.foojay.DistributionsKt.<clinit>(distributions.kt:18)
+  at org.gradle.toolchains.foojay.FoojayToolchainResolver.resolve(...)
+  at org.gradle.jvm.toolchain.internal.install.DefaultJavaToolchainProvisioningService.tryInstall(...)
+```
+
+**根因**：NeoForge 的 run 配置会请求一个本机未安装的 Java toolchain，Gradle 于是走
+自动下载，进而命中 `foojay-resolver-convention`。上游 `settings.gradle` 固定的是
+`0.8.0`，该版本在**静态初始化**里引用了 `JvmVendorSpec.IBM_SEMERU`，而 Gradle 9.5.1
+已把这个字段删掉 → `NoSuchFieldError`。**与 CarryOn 代码无关**，Fabric 不会踩到
+（Loom 解析启动器的路径不同）。
+
+**解决**：`settings.gradle` 里把解析器升到 `1.0.0`：
+
+```groovy
+id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+```
+
+## NeoForge 元数据警告
+
+NeoForge 26.3 启动时提示：
+
+```
+Mod carryon uses the deprecated `logoFile` property;
+change to `bannerFile` and/or (for square icons) `iconFile`
+```
+
+`logo.png` 是 676×676 的方形图，因此 `neoforge.mods.toml` 改用 `iconFile`。
+未参与构建的 `Forge/` 那份 `mods.toml` 保持 `logoFile` 不变 —— Forge 并未跟进这两个新属性。
+
+## 分支说明
+
+- `26.3`：本次移植，基于上游 `26.2` 的 `e50ddbc`
+- `26.2`：保持与上游 `Tschipp/CarryOn` 完全一致，没有移植提交
+
 ## 已知注意点
 
 - **没有生成 refmap**：`carryon.mixins.json` 里仍写着 `"refmap": "carryon.refmap.json"`，
@@ -175,3 +219,11 @@ mixin 注入目标方法全部存在：
 - **无任何 mixin 注入失败**（无 `InvalidInjectionException` / `MixinApplyError`），
   `Fabric/run/crash-reports` 为空
 - 游戏内实际功能（拾取/搬运/放置、第一人称与第三人称手臂渲染）已由使用者实机确认可用
+
+### 运行时验证（NeoForge dev 客户端，`.\gradlew.bat :NeoForge:runClient`）
+
+- NeoForge `26.3.0.23-beta` + Minecraft 26.3，FancyModLoader 12.0.0
+- 客户端窗口正常创建（`OpenGL` / `NVIDIA GeForce RTX 2060`），并进入 mod 加载界面
+- 进入世界：`Dev logged in with entity id 25 at (10.5, 94.0, -6.5)`，退出时正常 shutdown
+- **`Mods loaded with 1 warning(s)` 在修复 `logoFile` 后不再出现**
+- 无 mixin 注入失败、无 `NoSuchFieldError`，`NeoForge/run/crash-reports` 不存在
