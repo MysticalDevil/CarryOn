@@ -47,4 +47,6 @@ if (System.getenv('BUILD_NUMBER') != null && System.getenv('TAG_NAME') == null) 
 }
 
 rootProject.name = 'CarryOn'
-include("Common", "Fabric", "NeoForge", "Forge")
+// Forge is intentionally excluded: this port targets Minecraft 26.3, where the
+// upstream multiloader setup no longer ships a supported Forge variant.
+include("Common", "Fabric", "NeoForge")
