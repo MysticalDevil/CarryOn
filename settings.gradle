@@ -39,7 +39,12 @@ pluginManagement {
 
 
 plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+    // 1.0.0 required: the 0.8.0 resolver references JvmVendorSpec.IBM_SEMERU,
+    // which Gradle 9.5.1 removed, so any toolchain auto-provisioning aborted
+    // with NoSuchFieldError from Foojay's static initialiser.  That broke
+    // :NeoForge:runClient, whose run config requests a toolchain that is not
+    // installed locally.
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
 }
 
 if (System.getenv('BUILD_NUMBER') != null && System.getenv('TAG_NAME') == null) {
